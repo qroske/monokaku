@@ -19,3 +19,45 @@ target
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Secrets / local env
+.env
+.env.*
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_ecdsa*
+credentials.json
+.cargo/credentials*
+
+# macOS
+.DS_Store
+
+# AI
+AGENTS.md
+.cursor*
+.windsurf*
+.codeium*
+.aider*
+.github/copilot-instructions.md
+.github/instructions/
+.github/prompts/
+.github/chatmodes/
+.gemini*
+GEMINI.md
+.aiignore
+.aiexclude
+.cline*
+.roo*
+.continue/
+.junie/
+.specstory/
+.claude*
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+.vscode/mcp.json
