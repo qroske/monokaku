@@ -1,0 +1,10 @@
+[package]
+name = "monokaku"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Markdown editor"
+repository = "https://github.com/qroske/monokaku"
+license = "Apache-2.0"
+
+[dependencies]
