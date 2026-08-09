@@ -29,6 +29,7 @@
             packages = [
               rustToolchain # rustc / cargo / rustfmt / clippy
               pkgs.cargo-audit
+              pkgs.cargo-deny
             ];
           };
         }
