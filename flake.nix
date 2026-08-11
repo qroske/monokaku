@@ -40,35 +40,46 @@
           };
         }
       );
-      checks = forAllSystems (system: {
-        pre-commit-check = git-hooks.lib.${system}.run {
-          src = ./.;
-          hooks = {
-            rustfmt = {
-              enable = true;
-              settings = {
-                check = true;
+      checks = forAllSystems (system:
+        let
+          pkgs = pkgsFor system;
+          rustToolchain = pkgs.rust-bin.stable."1.97.1".default;
+        in
+        {
+          pre-commit-check = git-hooks.lib.${system}.run {
+            src = ./.;
+            hooks = {
+              rustfmt = {
+                enable = true;
+                package = rustToolchain;
+                settings = {
+                  check = true;
+                };
               };
-            };
-            clippy = {
-              enable = true;
-              settings = {
-                denyWarnings = true;
-                allFeatures = true;
+              clippy = {
+                enable = true;
+                packageOverrides = {
+                  cargo = rustToolchain;
+                  clippy = rustToolchain;
+                };
+                settings = {
+                  denyWarnings = true;
+                  allFeatures = true;
+                };
               };
-            };
-            cargo-deny = {
-              enable = true;
-              entry = "${(pkgsFor system).cargo-deny}/bin/cargo-deny check";
-              pass_filenames = false;
-            };
-            cargo-audit = {
-              enable = true;
-              entry = "${(pkgsFor system).cargo-audit}/bin/cargo-audit audit";
-              pass_filenames = false;
+              cargo-deny = {
+                enable = true;
+                entry = "${(pkgsFor system).cargo-deny}/bin/cargo-deny check";
+                pass_filenames = false;
+              };
+              cargo-audit = {
+                enable = true;
+                entry = "${(pkgsFor system).cargo-audit}/bin/cargo-audit audit";
+                pass_filenames = false;
+              };
             };
           };
-        };
-      });
+        }
+      );
     };
 }
