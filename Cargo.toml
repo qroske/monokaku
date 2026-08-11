@@ -8,3 +8,4 @@ repository = "https://github.com/qroske/monokaku"
 license = "Apache-2.0"
 
 [dependencies]
+gpui = { version = "0.2.2", features = ["runtime_shaders"] }
