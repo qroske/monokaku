@@ -1,23 +1,46 @@
-use gpui::{App, Application, Bounds, Context, Window, WindowBounds, WindowOptions, div, prelude::*, px, size};
+use gpui::{
+    App, Application, Bounds, Context, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    size,
+};
 
-struct EmptyWindow;
+struct MarkdownViewer {
+    content: String,
+}
 
-impl Render for EmptyWindow {
-    // 再描画のたびに呼ばれる関数。window/cxは今回未使用なので_接頭辞。戻り値は描画可能な要素
+impl Render for MarkdownViewer {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().size_full()
+        let lines = self
+            .content
+            .lines()
+            .map(|line| div().child(line.to_string()));
+        div()
+            .id("markdown-content")
+            .size_full()
+            .flex()
+            .flex_col()
+            .overflow_scroll()
+            .bg(gpui::white())
+            .text_color(gpui::black())
+            .px_3()
+            .children(lines)
     }
 }
 
 fn main() {
-    Application::new().run( |cx: &mut App| {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() != 2 {
+        panic!("使い方: cargo run -- <path/to/file.md>")
+    };
+    let path = args[1].clone();
+    let content = std::fs::read_to_string(&path).expect("ファイルの読み込みに失敗しました");
+    Application::new().run(move |cx: &mut App| {
         let bounds = Bounds::centered(None, size(px(800.0), px(600.0)), cx);
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |_, cx| cx.new(|_| EmptyWindow)
+            move |_, cx| cx.new(|_| MarkdownViewer { content }),
         )
         .unwrap();
         cx.activate(true);
