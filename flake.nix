@@ -7,9 +7,13 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    git-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { nixpkgs, rust-overlay, ... }:
+  outputs = { self, nixpkgs, rust-overlay, git-hooks, ... }:
     let
       systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -32,8 +36,39 @@
               pkgs.cargo-deny
               pkgs.bacon
             ];
+            shellHook = self.checks.${system}.pre-commit-check.shellHook;
           };
         }
       );
+      checks = forAllSystems (system: {
+        pre-commit-check = git-hooks.lib.${system}.run {
+          src = ./.;
+          hooks = {
+            rustfmt = {
+              enable = true;
+              settings = {
+                check = true;
+              };
+            };
+            clippy = {
+              enable = true;
+              settings = {
+                denyWarnings = true;
+                allFeatures = true;
+              };
+            };
+            cargo-deny = {
+              enable = true;
+              entry = "${(pkgsFor system).cargo-deny}/bin/cargo-deny check";
+              pass_filenames = false;
+            };
+            cargo-audit = {
+              enable = true;
+              entry = "${(pkgsFor system).cargo-audit}/bin/cargo-audit audit";
+              pass_filenames = false;
+            };
+          };
+        };
+      });
     };
 }
