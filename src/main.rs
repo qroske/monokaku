@@ -1,8 +1,8 @@
-use comrak::nodes::{AstNode, NodeValue};
+use comrak::nodes::{AstNode, ListDelimType, ListType, NodeValue};
 use comrak::{Arena, Options, parse_document};
 use gpui::{
-    App, Application, Bounds, Context, FontStyle, FontWeight, HighlightStyle, StyledText, Window,
-    WindowBounds, WindowOptions, div, prelude::*, px, size,
+    App, Application, Bounds, Context, FontStyle, FontWeight, HighlightStyle, StyledText,
+    UnderlineStyle, Window, WindowBounds, WindowOptions, div, prelude::*, px, size,
 };
 use std::ops::Range;
 
@@ -14,43 +14,89 @@ struct Line {
     text: String,
     highlights: Vec<(Range<usize>, HighlightStyle)>,
     heading_level: Option<u8>,
-    is_list_item: bool,
+    list_marker: Option<String>,
 }
 
 fn collect_inline<'a>(
     node: &'a AstNode<'a>,
     text: &mut String,
     highlights: &mut Vec<(Range<usize>, HighlightStyle)>,
+    style: HighlightStyle,
 ) {
     for child in node.children() {
         let value = child.data.borrow().value.clone();
         match value {
-            NodeValue::Text(t) => text.push_str(&t),
-            NodeValue::Strong => {
+            NodeValue::Text(t) => {
                 let start = text.len();
-                collect_inline(child, text, highlights);
-                highlights.push((
-                    start..text.len(),
+                text.push_str(&t);
+                if style != HighlightStyle::default() {
+                    highlights.push((start..text.len(), style));
+                }
+            }
+            NodeValue::Strong => {
+                collect_inline(
+                    child,
+                    text,
+                    highlights,
                     HighlightStyle {
                         font_weight: Some(FontWeight::BOLD),
-                        ..Default::default()
+                        ..style
                     },
-                ));
+                );
             }
             NodeValue::Emph => {
-                let start = text.len();
-                collect_inline(child, text, highlights);
-                highlights.push((
-                    start..text.len(),
+                collect_inline(
+                    child,
+                    text,
+                    highlights,
                     HighlightStyle {
                         font_style: Some(FontStyle::Italic),
-                        ..Default::default()
+                        ..style
                     },
-                ));
+                );
             }
-            NodeValue::SoftBreak | NodeValue::LineBreak => text.push(' '),
-            NodeValue::Code(code) => text.push_str(&code.literal),
-            _ => collect_inline(child, text, highlights),
+            NodeValue::Link(_) => {
+                collect_inline(
+                    child,
+                    text,
+                    highlights,
+                    HighlightStyle {
+                        underline: Some(UnderlineStyle {
+                            thickness: px(1.0),
+                            ..Default::default()
+                        }),
+                        ..style
+                    },
+                );
+            }
+            NodeValue::Image(_) => {
+                let prefix_start = text.len();
+                text.push_str("[image: ");
+                if style != HighlightStyle::default() {
+                    highlights.push((prefix_start..text.len(), style));
+                }
+                collect_inline(child, text, highlights, style);
+                let suffix_start = text.len();
+                text.push(']');
+                if style != HighlightStyle::default() {
+                    highlights.push((suffix_start..text.len(), style));
+                }
+            }
+            NodeValue::SoftBreak | NodeValue::LineBreak => {
+                let start = text.len();
+                text.push(' ');
+                if style != HighlightStyle::default() {
+                    highlights.push((start..text.len(), style));
+                }
+            }
+            NodeValue::Code(code) => {
+                let start = text.len();
+                text.push_str(&code.literal);
+                if style != HighlightStyle::default() {
+                    highlights.push((start..text.len(), style));
+                }
+            }
+            _ => collect_inline(child, text, highlights, style),
         }
     }
 }
@@ -67,41 +113,64 @@ fn parse_markdown(content: &str) -> Vec<Line> {
             NodeValue::Heading(heading) => {
                 let mut text = String::new();
                 let mut highlights = Vec::new();
-                collect_inline(node, &mut text, &mut highlights);
+                collect_inline(node, &mut text, &mut highlights, HighlightStyle::default());
                 if !text.is_empty() {
                     result.push(Line {
                         text,
                         highlights,
                         heading_level: Some(heading.level),
-                        is_list_item: false,
+                        list_marker: None,
                     });
                 }
             }
             NodeValue::Paragraph => {
                 let mut text = String::new();
                 let mut highlights = Vec::new();
-                collect_inline(node, &mut text, &mut highlights);
+                collect_inline(node, &mut text, &mut highlights, HighlightStyle::default());
                 if !text.is_empty() {
                     result.push(Line {
                         text,
                         highlights,
                         heading_level: None,
-                        is_list_item: false,
+                        list_marker: None,
                     });
                 }
             }
-            NodeValue::List(_) => {
+            NodeValue::List(list) => {
+                let mut ordinal = list.start;
+                let delimiter = match list.delimiter {
+                    ListDelimType::Period => '.',
+                    ListDelimType::Paren => ')',
+                };
                 for item in node.children() {
+                    let marker = match list.list_type {
+                        ListType::Bullet => "• ".to_string(),
+                        ListType::Ordered => {
+                            let marker = format!("{}{} ", ordinal, delimiter);
+                            ordinal += 1;
+                            marker
+                        }
+                    };
                     if let Some(block) = item.children().next() {
                         let mut text = String::new();
                         let mut highlights = Vec::new();
-                        collect_inline(block, &mut text, &mut highlights);
+                        let block_value = block.data.borrow().value.clone();
+                        if let NodeValue::CodeBlock(code_block) = block_value {
+                            text.push_str(&code_block.literal);
+                        } else {
+                            collect_inline(
+                                block,
+                                &mut text,
+                                &mut highlights,
+                                HighlightStyle::default(),
+                            );
+                        }
                         if !text.is_empty() {
                             result.push(Line {
                                 text,
                                 highlights,
                                 heading_level: None,
-                                is_list_item: true,
+                                list_marker: Some(marker),
                             });
                         }
                     }
@@ -117,8 +186,8 @@ impl Render for MarkdownViewer {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         let lines = parse_markdown(&self.content).into_iter().map(|line| {
             let mut row = div().flex();
-            if line.is_list_item {
-                row = row.child("• ");
+            if let Some(marker) = &line.list_marker {
+                row = row.child(marker.clone());
             }
             row = row.child(StyledText::new(line.text).with_highlights(line.highlights));
 
