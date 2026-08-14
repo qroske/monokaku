@@ -10,33 +10,44 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  cargo-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: $/.github/actions/setup-nix
+      - run: nix develop -c cargo audit
+
+  cargo-deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: $/.github/actions/setup-nix
+      - run: nix develop -c cargo deny check
+
   fmt:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: $/.github/actions/setup-nix
       - run: nix develop -c cargo fmt --all -- --check
 
   clippy:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
+      - uses: $/.github/actions/setup-nix
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          cmd-format: nix develop -c {0}
       - run: nix develop -c cargo clippy --all-features -- --D warnings
 
   test:
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
+      - uses: $/.github/actions/setup-nix
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          cmd-format: nix develop -c {0}
       - run: nix develop -c cargo test --all-features
 

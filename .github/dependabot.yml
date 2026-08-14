@@ -15,7 +15,9 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/setup-nix"
     schedule:
       interval: "weekly"
     cooldown:
