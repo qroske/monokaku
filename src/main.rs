@@ -6,27 +6,13 @@ use gpui::{
 };
 use std::ops::Range;
 
+mod markdown;
+
+use markdown::model::{Block, Line, MAX_NESTING_DEPTH};
+
 struct MarkdownViewer {
     content: String,
 }
-
-struct Line {
-    text: String,
-    highlights: Vec<(Range<usize>, HighlightStyle)>,
-    heading_level: Option<u8>,
-    list_marker: Option<String>,
-    indent_level: usize,
-}
-
-enum Block {
-    Text(Line),
-    Code(String, usize),
-    Table(Vec<(bool, Vec<Line>)>, usize),
-    Quote(Vec<Block>, usize),
-    Rule(usize),
-}
-
-const MAX_NESTING_DEPTH: usize = 64;
 
 fn parse_block<'a>(
     node: &'a AstNode<'a>,
