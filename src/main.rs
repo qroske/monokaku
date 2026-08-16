@@ -14,6 +14,7 @@ struct MarkdownViewer {
     content: String,
 }
 
+#[expect(clippy::too_many_lines)]
 fn parse_block<'a>(
     node: &'a AstNode<'a>,
     indent_level: usize,
@@ -114,6 +115,7 @@ fn parse_block<'a>(
     }
 }
 
+#[expect(clippy::too_many_lines)]
 fn parse_list<'a>(
     node: &'a AstNode<'a>,
     list: comrak::nodes::NodeList,
@@ -200,6 +202,7 @@ fn parse_list<'a>(
     }
 }
 
+#[expect(clippy::too_many_lines)]
 fn collect_inline<'a>(
     node: &'a AstNode<'a>,
     text: &mut String,
@@ -313,6 +316,7 @@ fn render_line(line: Line) -> Div {
     }
 }
 
+#[expect(clippy::too_many_lines)]
 fn render_block(block: Block) -> Div {
     match block {
         Block::Text(line) => render_line(line),
