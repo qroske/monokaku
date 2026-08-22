@@ -1,32 +1,9 @@
-use gpui::{
-    App, Application, Bounds, Context, Window, WindowBounds, WindowOptions, div, prelude::*, px,
-    size,
-};
+use gpui::{App, Application, Bounds, WindowBounds, WindowOptions, prelude::*, px, size};
 
 mod markdown;
+mod viewer;
 
-use markdown::parser::parse_markdown;
-use markdown::render::render_block;
-
-struct MarkdownViewer {
-    content: String,
-}
-
-impl Render for MarkdownViewer {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let blocks = parse_markdown(&self.content).into_iter().map(render_block);
-        div()
-            .id("markdown-content")
-            .size_full()
-            .flex()
-            .flex_col()
-            .overflow_scroll()
-            .bg(gpui::white())
-            .text_color(gpui::black())
-            .px_3()
-            .children(blocks)
-    }
-}
+use viewer::MarkdownViewer;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
