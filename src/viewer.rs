@@ -1,6 +1,7 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use gpui::{Context, Window, div, prelude::*, px};
+use gpui::{ClickEvent, Context, ElementId, Window, div, prelude::*, px};
 
 use crate::markdown::parser::parse_markdown;
 use crate::markdown::render::render_block;
@@ -8,21 +9,29 @@ use crate::markdown::render::render_block;
 pub struct MarkdownViewer {
     pub content: String,
     pub files: Vec<PathBuf>,
+    pub current_path: Arc<Path>,
 }
 
 impl Render for MarkdownViewer {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let sidebar = render_sidebar(&self.files);
-        let content = render_content(&self.content);
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let sidebar = render_sidebar(&self.files, cx);
+        let content = render_content(&self.content, &self.current_path);
 
         div().size_full().flex().child(sidebar).child(content)
     }
 }
 
-fn render_sidebar(files: &[PathBuf]) -> impl IntoElement {
+fn render_sidebar(files: &[PathBuf], cx: &mut Context<MarkdownViewer>) -> impl IntoElement {
     let items = files.iter().map(|path| {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        div().child(name.to_string())
+        let path: Arc<Path> = Arc::from(path.as_path());
+
+        div()
+            .id((ElementId::from(path.clone()), "sidebar-item"))
+            .child(name.to_string())
+            .on_click(cx.listener(move |_this, _event: &ClickEvent, _window, cx| {
+                load_file(path.clone(), cx);
+            }))
     });
 
     div()
@@ -35,11 +44,27 @@ fn render_sidebar(files: &[PathBuf]) -> impl IntoElement {
         .children(items)
 }
 
-fn render_content(content: &str) -> impl IntoElement {
+fn load_file(path: Arc<Path>, cx: &mut Context<MarkdownViewer>) {
+    cx.spawn(async move |this, cx| {
+        let read_path = path.clone();
+        let content = cx
+            .background_executor()
+            .spawn(async move { std::fs::read_to_string(&*read_path) })
+            .await;
+        this.update(cx, |this, cx| {
+            this.content = content.expect("ファイルの読み込みに失敗しました");
+            this.current_path = path;
+            cx.notify();
+        })
+    })
+    .detach();
+}
+
+fn render_content(content: &str, current_path: &Arc<Path>) -> impl IntoElement {
     let blocks = parse_markdown(content).into_iter().map(render_block);
 
     div()
-        .id("markdown-content")
+        .id((ElementId::from(current_path.clone()), "content"))
         .flex_1()
         .flex()
         .flex_col()
