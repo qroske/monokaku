@@ -6,12 +6,14 @@ pub fn list_markdown_files(dir: &Path) -> Vec<PathBuf> {
         return Vec::new();
     };
 
-    entries
+    let mut files: Vec<PathBuf> = entries
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.path())
         .filter(|path| path.is_file())
         .filter(|path| path.extension().is_some_and(|ext| ext == "md"))
-        .collect()
+        .collect();
+    files.sort();
+    files
 }
 
 #[cfg(test)]
