@@ -34,8 +34,7 @@ mod tests {
         fs::write(dir.join("b.md"), "# b").expect("書き込みに失敗しました");
         fs::write(dir.join("c.txt"), "not markdown").expect("書き込みに失敗しました");
 
-        let mut files = list_markdown_files(&dir);
-        files.sort();
+        let files = list_markdown_files(&dir);
 
         assert_eq!(files, vec![dir.join("a.md"), dir.join("b.md")]);
 
