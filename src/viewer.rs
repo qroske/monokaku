@@ -1,22 +1,26 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
-use gpui::{ClickEvent, Context, ElementId, FontWeight, Window, div, prelude::*, px};
+use gpui::{
+    AnyElement, ClickEvent, Context, Div, ElementId, FontWeight, Window, div, prelude::*, px,
+};
 
+use crate::files::FileEntry;
 use crate::markdown::parser::parse_markdown;
 use crate::markdown::render::render_block;
 
 const SELECTED_BACKGROUND: u32 = 0xe0e0e0;
+const INDENT_STEP: f32 = 16.0;
 
 pub struct MarkdownViewer {
     pub content: String,
-    pub files: Vec<PathBuf>,
+    pub tree: Vec<FileEntry>,
     pub current_path: Arc<Path>,
 }
 
 impl Render for MarkdownViewer {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let sidebar = render_sidebar(&self.files, &self.current_path, cx);
+        let sidebar = render_sidebar(&self.tree, &self.current_path, cx);
         let content = render_content(&self.content, &self.current_path);
 
         div().size_full().flex().child(sidebar).child(content)
@@ -24,13 +28,13 @@ impl Render for MarkdownViewer {
 }
 
 fn render_sidebar(
-    files: &[PathBuf],
+    tree: &[FileEntry],
     current_path: &Arc<Path>,
     cx: &mut Context<MarkdownViewer>,
 ) -> impl IntoElement {
-    let items = files
+    let items = tree
         .iter()
-        .map(|path| render_sidebar_item(path, current_path, cx));
+        .map(|entry| render_tree_entry(entry, current_path, 0, cx));
 
     div()
         .w(px(200.0))
@@ -42,17 +46,57 @@ fn render_sidebar(
         .children(items)
 }
 
-fn render_sidebar_item(
-    path: &Path,
+fn render_tree_entry(
+    entry: &FileEntry,
     current_path: &Arc<Path>,
+    depth: usize,
+    cx: &mut Context<MarkdownViewer>,
+) -> AnyElement {
+    match entry {
+        FileEntry::Dir { name, children, .. } => {
+            render_dir(name, children, current_path, depth, cx).into_any_element()
+        }
+        FileEntry::File { path, name } => {
+            render_file(path, name, current_path, depth, cx).into_any_element()
+        }
+    }
+}
+
+fn render_dir(
+    name: &str,
+    children: &[FileEntry],
+    current_path: &Arc<Path>,
+    depth: usize,
+    cx: &mut Context<MarkdownViewer>,
+) -> Div {
+    let rows = children
+        .iter()
+        .map(|child| render_tree_entry(child, current_path, depth + 1, cx));
+
+    div()
+        .flex()
+        .flex_col()
+        .child(
+            div()
+                .pl(px(INDENT_STEP * depth as f32))
+                .child(name.to_string()),
+        )
+        .children(rows)
+}
+
+fn render_file(
+    path: &Path,
+    name: &str,
+    current_path: &Arc<Path>,
+    depth: usize,
     cx: &mut Context<MarkdownViewer>,
 ) -> impl IntoElement + use<> {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let is_selected = path == current_path.as_ref();
     let path: Arc<Path> = Arc::from(path);
 
     let mut item = div()
         .id((ElementId::from(path.clone()), "sidebar-item"))
+        .pl(px(INDENT_STEP * depth as f32))
         .child(name.to_string())
         .on_click(cx.listener(move |_this, _event: &ClickEvent, _window, cx| {
             load_file(path.clone(), cx);
