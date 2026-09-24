@@ -26,7 +26,17 @@ pub fn build_file_tree(dir: &Path) -> Vec<FileEntry> {
     tree
 }
 
-pub fn first_markdown(tree: &[FileEntry]) -> Option<PathBuf> {
+pub fn first_markdown_content(
+    tree: &[FileEntry],
+) -> Result<Option<(PathBuf, String)>, std::io::Error> {
+    let Some(path) = first_markdown(tree) else {
+        return Ok(None);
+    };
+    let content = fs::read_to_string(&path)?;
+    Ok(Some((path, content)))
+}
+
+fn first_markdown(tree: &[FileEntry]) -> Option<PathBuf> {
     let file_here = tree.iter().find_map(|entry| match entry {
         FileEntry::File { path, .. } => Some(path.clone()),
         FileEntry::Dir { .. } => None,

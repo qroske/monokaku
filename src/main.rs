@@ -7,13 +7,12 @@ mod files;
 mod markdown;
 mod viewer;
 
-use files::{FileEntry, build_file_tree, first_markdown};
+use files::{FileEntry, build_file_tree, first_markdown_content};
 use viewer::MarkdownViewer;
 
 fn main() {
     let path = parse_args();
-    let (tree, selected) = resolve_initial_state(&path);
-    let content = std::fs::read_to_string(&selected).expect("ファイルの読み込みに失敗しました");
+    let (tree, selected, content) = resolve_initial_state(&path);
     let current_path: Arc<Path> = Arc::from(selected);
 
     run_app(content, tree, current_path)
@@ -27,21 +26,26 @@ fn parse_args() -> String {
     args[1].clone()
 }
 
-fn resolve_initial_state(path: &str) -> (Vec<FileEntry>, PathBuf) {
+fn resolve_initial_state(path: &str) -> (Vec<FileEntry>, PathBuf, String) {
     let path = Path::new(path);
     let is_dir = path.is_dir();
     let dir = listing_dir(path, is_dir);
     let tree = build_file_tree(dir);
-    let selected = if is_dir {
-        first_markdown(&tree).expect("ディレクトリ内に.mdファイルが見つかりませんでした")
-    } else {
-        match path.file_name() {
-            Some(name) => dir.join(name),
-            None => path.to_path_buf(),
-        }
-    };
+    if is_dir {
+        let (selected, content) = match first_markdown_content(&tree) {
+            Ok(Some(found)) => found,
+            Ok(None) => panic!("ディレクトリ内に.mdファイルが見つかりませんでした"),
+            Err(err) => panic!("ファイルの読み込みに失敗しました: {err}"),
+        };
+        return (tree, selected, content);
+    }
 
-    (tree, selected)
+    let selected = match path.file_name() {
+        Some(name) => dir.join(name),
+        None => path.to_path_buf(),
+    };
+    let content = std::fs::read_to_string(&selected).expect("ファイルの読み込みに失敗しました");
+    (tree, selected, content)
 }
 
 fn listing_dir(path: &Path, is_dir: bool) -> &Path {
@@ -67,6 +71,7 @@ fn run_app(content: String, tree: Vec<FileEntry>, current_path: Arc<Path>) {
                     content,
                     tree,
                     current_path,
+                    generation: 0,
                 })
             },
         )
